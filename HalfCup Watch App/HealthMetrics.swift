@@ -97,7 +97,6 @@ enum HealthMetricQuery {
 final class HealthMetricsStore {
     private(set) var readings: [HealthMetricReading]
     private(set) var hrvTrend: [HealthMetricPoint] = []
-    private(set) var heartRateTrend: [HealthMetricPoint] = []
     private(set) var dailyCalorieTrend: [HealthMetricPoint] = []
     private(set) var dailySleepTrend: [HealthMetricPoint] = []
     private(set) var stressSnapshot = HealthStressSnapshot.waiting
@@ -160,12 +159,6 @@ final class HealthMetricsStore {
                 value: Double(value)
             )
         }
-        store.heartRateTrend = [70, 73, 68, 77, 83, 76, 72, 74, 69, 71].enumerated().map { index, value in
-            HealthMetricPoint(
-                date: now.addingTimeInterval(Double(index - 9) * 10 * 60),
-                value: Double(value)
-            )
-        }
         store.dailyCalorieTrend = [1980, 2140, 2055, 2300, 2210, 2080, 2420, 2360, 2195, 2270].enumerated().map { index, value in
             HealthMetricPoint(
                 date: Calendar.current.date(byAdding: .day, value: index - 9, to: Calendar.current.startOfDay(for: now)) ?? now,
@@ -201,12 +194,10 @@ final class HealthMetricsStore {
             try await requestAuthorizationIfNeeded()
             let updatedReadings = try await fetchReadings()
             let updatedTrend = try await fetchHRVTrend()
-            let updatedHeartRateTrend = try await fetchHeartRateTrend()
             let updatedDailyCalorieTrend = (try? await fetchDailyCalorieTrend()) ?? []
             let updatedDailySleepTrend = (try? await fetchDailySleepTrend()) ?? []
             readings = updatedReadings
             hrvTrend = updatedTrend
-            heartRateTrend = updatedHeartRateTrend
             dailyCalorieTrend = updatedDailyCalorieTrend
             dailySleepTrend = updatedDailySleepTrend
             stressSnapshot = makeStressSnapshot(from: updatedReadings)
@@ -305,23 +296,6 @@ final class HealthMetricsStore {
             }
     }
 
-    private func fetchHeartRateTrend() async throws -> [HealthMetricPoint] {
-        guard let quantityType = HKObjectType.quantityType(forIdentifier: .heartRate) else {
-            return []
-        }
-
-        let samples = try await quantitySamples(for: quantityType, lookbackDays: 1, limit: 24)
-
-        return samples
-            .sorted { $0.endDate < $1.endDate }
-            .map { sample in
-                HealthMetricPoint(
-                    date: sample.endDate,
-                    value: sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
-                )
-            }
-    }
-
     private func fetchDailyCalorieTrend() async throws -> [HealthMetricPoint] {
         guard let basalType = HKObjectType.quantityType(forIdentifier: .basalEnergyBurned),
               let activeType = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)
@@ -366,12 +340,20 @@ final class HealthMetricsStore {
         lookbackDays: Int,
         limit: Int
     ) async throws -> [HKQuantitySample] {
+        let startDate = Calendar.current.date(
+            byAdding: .day,
+            value: -lookbackDays,
+            to: Date()
+        )
+        return try await quantitySamples(for: quantityType, startDate: startDate, limit: limit)
+    }
+
+    private func quantitySamples(
+        for quantityType: HKQuantityType,
+        startDate: Date?,
+        limit: Int
+    ) async throws -> [HKQuantitySample] {
         try await withCheckedThrowingContinuation { continuation in
-            let startDate = Calendar.current.date(
-                byAdding: .day,
-                value: -lookbackDays,
-                to: Date()
-            )
             let predicate = HKQuery.predicateForSamples(
                 withStart: startDate,
                 end: nil,
@@ -798,7 +780,7 @@ final class HealthMetricsStore {
             systemImage: "lungs.fill",
             quantityIdentifier: .vo2Max,
             unit: vo2MaxUnit,
-            lookbackDays: 120,
+            lookbackDays: 365,
             query: .latest
         ) { value, date in
             HealthMetricReading(

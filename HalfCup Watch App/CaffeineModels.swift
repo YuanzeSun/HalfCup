@@ -207,6 +207,10 @@ final class CaffeineStore {
         doses.removeAll { calendar.isDate($0.date, inSameDayAs: date) }
     }
 
+    func clearAll() {
+        doses.removeAll()
+    }
+
     func snapshot(at date: Date = Date()) -> CaffeineSnapshot {
         let activeDoses = CaffeineMetabolism.activeDoses(from: doses, at: date)
         let totalActive = activeDoses.reduce(0) { $0 + $1.milligrams }

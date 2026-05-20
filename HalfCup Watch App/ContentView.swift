@@ -16,6 +16,9 @@ struct ContentView: View {
     @State private var trainingStore = TrainingMetricsStore()
     @State private var now = Date()
     @State private var isCustomizingModules = false
+    @State private var pendingCaffeinePreset: CaffeinePreset?
+    @State private var isConfirmingCaffeinePreset = false
+    @State private var isConfirmingCaffeineClear = false
     @AppStorage("halfCup.dashboard.moduleOrder") private var moduleOrderRaw = DashboardModule.defaultOrderRaw
     private let refreshHealthOnAppear: Bool
     private let startSensorsOnAppear: Bool
@@ -63,6 +66,36 @@ struct ContentView: View {
         .background(HalfCupBackground())
         .sheet(isPresented: $isCustomizingModules) {
             ModuleOrderView(orderRaw: $moduleOrderRaw)
+        }
+        .confirmationDialog(
+            "确认记录咖啡因",
+            isPresented: $isConfirmingCaffeinePreset,
+            titleVisibility: .visible
+        ) {
+            if let preset = pendingCaffeinePreset {
+                Button("记录 \(preset.title) \(Int(preset.milligrams)) mg") {
+                    now = Date()
+                    caffeineStore.add(preset, at: now)
+                    pendingCaffeinePreset = nil
+                    syncWidgetSnapshot(forceReload: true)
+                }
+            }
+
+            Button("取消", role: .cancel) {
+                pendingCaffeinePreset = nil
+            }
+        }
+        .confirmationDialog(
+            "清空当前咖啡因",
+            isPresented: $isConfirmingCaffeineClear,
+            titleVisibility: .visible
+        ) {
+            Button("清空", role: .destructive) {
+                caffeineStore.clearAll()
+                syncWidgetSnapshot(forceReload: true)
+            }
+
+            Button("取消", role: .cancel) {}
         }
         .onAppear {
             if startSensorsOnAppear {
@@ -119,10 +152,13 @@ struct ContentView: View {
             CaffeineOverviewCard(
                 store: caffeineStore,
                 snapshot: caffeineSnapshot
-            )
+            ) {
+                isConfirmingCaffeineClear = true
+            }
         case .quickDose:
-            QuickDoseGrid(store: caffeineStore, now: $now) {
-                syncWidgetSnapshot(forceReload: true)
+            QuickDoseGrid { preset in
+                pendingCaffeinePreset = preset
+                isConfirmingCaffeinePreset = true
             }
         case .barometer:
             BarometerCard(store: barometerStore)
@@ -145,13 +181,11 @@ struct ContentView: View {
             TrainingEffectCard(snapshot: trainingStore.snapshot)
         case .raceStamina:
             RaceStaminaCard(snapshot: trainingStore.snapshot)
-        case .recovery:
-            RecoveryReadinessCard(snapshot: trainingStore.snapshot)
         case .healthMetrics:
             HealthMetricGrid(readings: healthStore.dashboardReadings)
         case .dailyCalories:
             DailyTrendCard(
-                title: "每日卡路里",
+                title: "卡路里趋势",
                 value: dailyCalorieSummary,
                 points: healthStore.dailyCalorieTrend,
                 unitText: "kcal",
@@ -160,7 +194,7 @@ struct ContentView: View {
             )
         case .dailySleep:
             DailyTrendCard(
-                title: "睡眠时间",
+                title: "睡眠趋势",
                 value: dailySleepSummary,
                 points: healthStore.dailySleepTrend,
                 unitText: "h",
@@ -388,7 +422,6 @@ private enum DashboardModule: String, CaseIterable, Identifiable {
     case trainingStatus
     case trainingEffect
     case raceStamina
-    case recovery
     case healthMetrics
     case dailyCalories
     case dailySleep
@@ -406,10 +439,9 @@ private enum DashboardModule: String, CaseIterable, Identifiable {
         case .trainingStatus: return "训练状态"
         case .trainingEffect: return "训练效果"
         case .raceStamina: return "表现/体力"
-        case .recovery: return "清醒度"
         case .healthMetrics: return "健康数据"
-        case .dailyCalories: return "每日卡路里"
-        case .dailySleep: return "睡眠时间"
+        case .dailyCalories: return "卡路里趋势"
+        case .dailySleep: return "睡眠趋势"
         }
     }
 
@@ -424,7 +456,6 @@ private enum DashboardModule: String, CaseIterable, Identifiable {
         case .trainingStatus: return "figure.run"
         case .trainingEffect: return "bolt.heart.fill"
         case .raceStamina: return "flag.checkered"
-        case .recovery: return "bed.double.fill"
         case .healthMetrics: return "heart.text.square.fill"
         case .dailyCalories: return "flame.fill"
         case .dailySleep: return "moon.zzz.fill"
@@ -441,7 +472,6 @@ private enum DashboardModule: String, CaseIterable, Identifiable {
         .trainingStatus,
         .trainingEffect,
         .raceStamina,
-        .recovery,
         .healthMetrics,
         .dailyCalories,
         .dailySleep
@@ -812,58 +842,6 @@ private struct RaceStaminaCard: View {
     }
 }
 
-private struct RecoveryReadinessCard: View {
-    let snapshot: TrainingSnapshot
-
-    var body: some View {
-        HalfCupCard {
-            VStack(alignment: .leading, spacing: 9) {
-                HStack {
-                    Label("清醒度", systemImage: "bed.double.fill")
-                        .font(.headline.weight(.semibold))
-
-                    Spacer()
-
-                    Text(snapshot.sleepDebtSummaryText)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                }
-
-                HStack(spacing: 6) {
-                    ForEach(snapshot.alertnessBlocks) { block in
-                        VStack(spacing: 2) {
-                            Text(block.title)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.secondary)
-
-                            Text("\(block.score)")
-                                .font(.system(size: 16, weight: .bold, design: .rounded))
-                                .foregroundStyle(alertnessTint(block.score))
-                                .monospacedDigit()
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 38)
-                        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    }
-                }
-            }
-        }
-    }
-
-    private func alertnessTint(_ score: Int) -> Color {
-        switch score {
-        case 75...:
-            return .green
-        case 50..<75:
-            return .yellow
-        default:
-            return .orange
-        }
-    }
-}
-
 private struct EffectBar: View {
     let title: String
     let value: Double
@@ -924,6 +902,25 @@ private struct DailyTrendCard: View {
     }
 }
 
+private struct BarometerValueLine: View {
+    let value: String
+    let unit: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Text(value)
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .monospacedDigit()
+
+            Text(unit)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
 private struct BarometerCard: View {
     let store: BarometerStore
 
@@ -932,50 +929,49 @@ private struct BarometerCard: View {
             VStack(alignment: .leading, spacing: 9) {
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 4) {
-                        HStack(alignment: .firstTextBaseline, spacing: 3) {
-                            Text(store.pressureText)
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.72)
-                                .monospacedDigit()
-
-                            Text("hPa")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Text("\(store.altitudeLabel) \(store.altitudeText)")
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-
-                        Text(store.statusMessage)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
+                        BarometerValueLine(value: store.pressureText, unit: "hPa")
+                        BarometerValueLine(value: store.altitudeValueText, unit: "m")
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 HStack(spacing: 6) {
-                    TrendPanel(title: "实时", value: store.pressureText == "N/A" ? "N/A" : "\(store.pressureText) hPa") {
-                        VStack(spacing: 4) {
-                            PressureTrendLine(points: store.pressureTrend, tint: .blue)
-                            AltitudeTrendLine(points: store.pressureTrend, tint: .green)
-                        }
+                    TrendPanel(title: "实时气压", value: store.pressureText == "N/A" ? "N/A" : "\(store.pressureText) hPa") {
+                        PressureTrendLine(
+                            points: store.pressureTrend,
+                            tint: .blue,
+                            timeWindow: BarometerStore.realtimeTrendInterval
+                        )
                     }
 
-                    TrendPanel(title: "12h", value: "10min") {
-                        VStack(spacing: 4) {
-                            PressureTrendLine(points: store.historyTrend, tint: .cyan)
-                            AltitudeTrendLine(points: store.historyTrend, tint: .mint)
-                        }
+                    TrendPanel(title: "实时海拔", value: store.altitudeText == "N/A" ? "N/A" : store.altitudeText) {
+                        AltitudeTrendLine(
+                            points: store.pressureTrend,
+                            tint: .green,
+                            timeWindow: BarometerStore.realtimeTrendInterval
+                        )
                     }
                 }
 
-                Text("上方为气压，下方为海拔")
+                VStack(spacing: 6) {
+                    TrendPanel(title: "12h气压", value: "10min") {
+                        PressureTrendLine(
+                            points: store.historyTrend,
+                            tint: .cyan,
+                            timeWindow: HalfCupHistoryStore.retentionInterval
+                        )
+                    }
+
+                    TrendPanel(title: "12h海拔", value: "10min") {
+                        AltitudeTrendLine(
+                            points: store.historyTrend,
+                            tint: .mint,
+                            timeWindow: HalfCupHistoryStore.retentionInterval
+                        )
+                    }
+                }
+
+                Text("实时气压，实时海拔，12h气压，12h海拔")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -1038,12 +1034,22 @@ private struct StressOverviewCard: View {
                     )
                 }
 
-                VStack(spacing: 4) {
-                    HRVTrendLine(points: hrvHistoryTrend, tint: .cyan)
-                    HRVTrendLine(points: heartRateHistoryTrend, tint: .pink)
+                VStack(spacing: 6) {
+                    HealthTrendLine(
+                        points: heartRateHistoryTrend,
+                        tint: .orange,
+                        accessibilityLabel: "12小时心率趋势",
+                        timeWindow: HalfCupHistoryStore.retentionInterval
+                    )
+                    HealthTrendLine(
+                        points: hrvHistoryTrend,
+                        tint: .cyan,
+                        accessibilityLabel: "12小时 HRV 趋势",
+                        timeWindow: HalfCupHistoryStore.retentionInterval
+                    )
                 }
 
-                Text("上方为 HRV，下方为心率")
+                Text("12h心率，12h HRV")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -1283,6 +1289,7 @@ private struct PlanetVisibilityRow: View {
 private struct CaffeineOverviewCard: View {
     let store: CaffeineStore
     let snapshot: CaffeineSnapshot
+    let onClear: () -> Void
 
     var body: some View {
         HalfCupCard {
@@ -1292,6 +1299,16 @@ private struct CaffeineOverviewCard: View {
                         .font(.headline.weight(.semibold))
 
                     Spacer()
+
+                    Button {
+                        onClear()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("清空咖啡因")
 
                     Text(snapshot.remainingMilligramsText)
                         .font(.headline.monospacedDigit().weight(.bold))
@@ -1373,9 +1390,7 @@ private struct CaffeineGaugeBar: View {
 }
 
 private struct QuickDoseGrid: View {
-    let store: CaffeineStore
-    @Binding var now: Date
-    let onDoseChanged: () -> Void
+    let onPresetSelected: (CaffeinePreset) -> Void
 
     private let columns = [
         GridItem(.flexible(), spacing: 7),
@@ -1391,9 +1406,7 @@ private struct QuickDoseGrid: View {
             LazyVGrid(columns: columns, spacing: 7) {
                 ForEach(CaffeinePreset.defaults) { preset in
                     Button {
-                        now = Date()
-                        store.add(preset, at: now)
-                        onDoseChanged()
+                        onPresetSelected(preset)
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: preset.systemImage)
@@ -1487,86 +1500,22 @@ private struct HealthMetricTile: View {
     }
 }
 
-private struct HRVTrendLine: View {
+private struct HealthTrendLine: View {
     let points: [HealthMetricPoint]
     let tint: Color
+    let accessibilityLabel: String
+    let timeWindow: TimeInterval?
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(.white.opacity(0.06))
-
-                if points.count >= 2 {
-                    Path { path in
-                        let values = points.map(\.value)
-                        let minValue = values.min() ?? 0
-                        let maxValue = values.max() ?? 1
-                        let range = max(maxValue - minValue, 1)
-                        let dateRange = chartDateRange(for: points.map(\.date))
-
-                        for (index, point) in points.enumerated() {
-                            let x = chartX(
-                                for: point.date,
-                                in: dateRange,
-                                width: geometry.size.width
-                            )
-                            let normalized = (point.value - minValue) / range
-                            let y = geometry.size.height * (1 - CGFloat(normalized))
-
-                            if index == 0 {
-                                path.move(to: CGPoint(x: x, y: y))
-                            } else {
-                                path.addLine(to: CGPoint(x: x, y: y))
-                            }
-                        }
-                    }
-                    .stroke(tint, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 6)
-
-                    chartLabels(
-                        top: "\(Int((points.map(\.value).max() ?? 0).rounded()))",
-                        start: points.first?.date,
-                        end: points.last?.date
-                    )
-                } else {
-                    Path { path in
-                        let y = geometry.size.height / 2
-                        path.move(to: CGPoint(x: 6, y: y))
-                        path.addLine(to: CGPoint(x: geometry.size.width - 6, y: y))
-                    }
-                    .stroke(.white.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                }
-            }
-        }
-        .frame(height: 34)
-        .accessibilityLabel("HRV 趋势")
-    }
-
-    private func chartLabels(top: String, start: Date?, end: Date?) -> some View {
-        ZStack {
-            Text(top)
-                .font(.system(size: 7, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .padding(.top, 2)
-                .padding(.trailing, 4)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-
-            if let start, let end, end.timeIntervalSince(start) > 60 {
-                HStack {
-                    Text(start.clockText())
-                    Spacer(minLength: 0)
-                    Text(end.clockText())
-                }
-                .font(.system(size: 7, weight: .medium, design: .monospaced))
-                .foregroundStyle(.secondary.opacity(0.85))
-                .padding(.horizontal, 4)
-                .padding(.bottom, 1)
-                .frame(maxHeight: .infinity, alignment: .bottom)
-            }
-        }
+        TrendLineChart(
+            samples: points.map { TrendChartSample(date: $0.date, value: $0.value) },
+            tint: tint,
+            plotHeight: 32,
+            timeWindow: timeWindow,
+            valueFormatter: { "\(Int($0.rounded()))" },
+            dateFormatter: { $0.clockText() },
+            accessibilityLabel: accessibilityLabel
+        )
     }
 }
 
@@ -1577,261 +1526,198 @@ private struct DailyTrendLine: View {
     let valueFormatter: (Double) -> String
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(.white.opacity(0.06))
-
-                if points.count >= 2 {
-                    Path { path in
-                        let values = points.map(\.value)
-                        let minValue = values.min() ?? 0
-                        let maxValue = values.max() ?? 1
-                        let range = max(maxValue - minValue, max(maxValue * 0.08, 1))
-                        let dateRange = chartDateRange(for: points.map(\.date))
-
-                        for (index, point) in points.enumerated() {
-                            let x = chartX(
-                                for: point.date,
-                                in: dateRange,
-                                width: geometry.size.width
-                            )
-                            let normalized = (point.value - minValue) / range
-                            let y = geometry.size.height * (1 - CGFloat(normalized))
-
-                            if index == 0 {
-                                path.move(to: CGPoint(x: x, y: y))
-                            } else {
-                                path.addLine(to: CGPoint(x: x, y: y))
-                            }
-                        }
-                    }
-                    .stroke(tint, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 7)
-
-                    chartLabels(
-                        top: "\(valueFormatter(points.map(\.value).max() ?? 0)) \(unitText)",
-                        start: points.first?.date,
-                        end: points.last?.date
-                    )
-                } else {
-                    Path { path in
-                        let y = geometry.size.height / 2
-                        path.move(to: CGPoint(x: 6, y: y))
-                        path.addLine(to: CGPoint(x: geometry.size.width - 6, y: y))
-                    }
-                    .stroke(.white.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                }
-            }
-        }
-        .frame(height: 58)
-        .accessibilityLabel("\(titleText) 趋势")
+        TrendLineChart(
+            samples: points.map { TrendChartSample(date: $0.date, value: $0.value) },
+            tint: tint,
+            plotHeight: 52,
+            timeWindow: nil,
+            valueFormatter: { "\(valueFormatter($0)) \(unitText)" },
+            dateFormatter: { $0.shortDayText() },
+            accessibilityLabel: "\(titleText) 趋势"
+        )
     }
 
     private var titleText: String {
         unitText == "h" ? "睡眠" : "卡路里"
-    }
-
-    private func chartLabels(top: String, start: Date?, end: Date?) -> some View {
-        ZStack {
-            Text(top)
-                .font(.system(size: 8, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .padding(.top, 3)
-                .padding(.trailing, 5)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-
-            if let start, let end, end > start {
-                HStack {
-                    Text(start.shortDayText())
-                    Spacer(minLength: 0)
-                    Text(end.shortDayText())
-                }
-                .font(.system(size: 8, weight: .medium, design: .monospaced))
-                .foregroundStyle(.secondary.opacity(0.85))
-                .padding(.horizontal, 5)
-                .padding(.bottom, 2)
-                .frame(maxHeight: .infinity, alignment: .bottom)
-            }
-        }
     }
 }
 
 private struct PressureTrendLine: View {
     let points: [BarometerPoint]
     let tint: Color
+    let timeWindow: TimeInterval?
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(.white.opacity(0.06))
-
-                if points.count >= 2 {
-                    Path { path in
-                        let values = points.map(\.pressureHectopascals)
-                        let minValue = values.min() ?? 0
-                        let maxValue = values.max() ?? 1
-                        let range = max(maxValue - minValue, 0.4)
-                        let dateRange = chartDateRange(for: points.map(\.date))
-
-                        for (index, point) in points.enumerated() {
-                            let x = chartX(
-                                for: point.date,
-                                in: dateRange,
-                                width: geometry.size.width
-                            )
-                            let normalized = (point.pressureHectopascals - minValue) / range
-                            let y = geometry.size.height * (1 - CGFloat(normalized))
-
-                            if index == 0 {
-                                path.move(to: CGPoint(x: x, y: y))
-                            } else {
-                                path.addLine(to: CGPoint(x: x, y: y))
-                            }
-                        }
-                    }
-                    .stroke(tint, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 6)
-
-                    chartLabels(
-                        top: String(format: "%.1f", points.map(\.pressureHectopascals).max() ?? 0),
-                        start: points.first?.date,
-                        end: points.last?.date
-                    )
-                } else {
-                    Path { path in
-                        let y = geometry.size.height / 2
-                        path.move(to: CGPoint(x: 6, y: y))
-                        path.addLine(to: CGPoint(x: geometry.size.width - 6, y: y))
-                    }
-                    .stroke(.white.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                }
-            }
-        }
-        .frame(height: 30)
-        .accessibilityLabel("气压趋势")
-    }
-
-    private func chartLabels(top: String, start: Date?, end: Date?) -> some View {
-        ZStack {
-            Text(top)
-                .font(.system(size: 7, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .padding(.top, 2)
-                .padding(.trailing, 4)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-
-            if let start, let end, end.timeIntervalSince(start) > 60 {
-                HStack {
-                    Text(start.clockText())
-                    Spacer(minLength: 0)
-                    Text(end.clockText())
-                }
-                .font(.system(size: 7, weight: .medium, design: .monospaced))
-                .foregroundStyle(.secondary.opacity(0.85))
-                .padding(.horizontal, 4)
-                .padding(.bottom, 1)
-                .frame(maxHeight: .infinity, alignment: .bottom)
-            }
-        }
+        TrendLineChart(
+            samples: points.map {
+                TrendChartSample(date: $0.date, value: $0.pressureHectopascals)
+            },
+            tint: tint,
+            plotHeight: 30,
+            timeWindow: timeWindow,
+            valueFormatter: { String(format: "%.1f", $0) },
+            dateFormatter: { $0.clockText() },
+            accessibilityLabel: "气压趋势"
+        )
     }
 }
 
 private struct AltitudeTrendLine: View {
     let points: [BarometerPoint]
     let tint: Color
+    let timeWindow: TimeInterval?
 
     private var altitudePoints: [BarometerPoint] {
         points.filter { $0.chartAltitudeMeters != nil }
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(.white.opacity(0.06))
+        TrendLineChart(
+            samples: altitudePoints.compactMap { point in
+                guard let altitude = point.chartAltitudeMeters else { return nil }
+                return TrendChartSample(date: point.date, value: altitude)
+            },
+            tint: tint,
+            plotHeight: 30,
+            timeWindow: timeWindow,
+            valueFormatter: { "\(Int($0.rounded()))m" },
+            dateFormatter: { $0.clockText() },
+            accessibilityLabel: "海拔趋势"
+        )
+    }
+}
 
-                if altitudePoints.count >= 2 {
-                    Path { path in
-                        let values = altitudePoints.compactMap(\.chartAltitudeMeters)
-                        let minValue = values.min() ?? 0
-                        let maxValue = values.max() ?? 1
-                        let range = max(maxValue - minValue, 0.2)
-                        let dateRange = chartDateRange(for: altitudePoints.map(\.date))
+private struct TrendChartSample {
+    let date: Date
+    let value: Double
+}
 
-                        for (index, point) in altitudePoints.enumerated() {
-                            guard let altitude = point.chartAltitudeMeters else { continue }
+private struct TrendLineChart: View {
+    let samples: [TrendChartSample]
+    let tint: Color
+    let plotHeight: CGFloat
+    let timeWindow: TimeInterval?
+    let valueFormatter: (Double) -> String
+    let dateFormatter: (Date) -> String
+    let accessibilityLabel: String
 
-                            let x = chartX(
-                                for: point.date,
-                                in: dateRange,
-                                width: geometry.size.width
-                            )
-                            let normalized = (altitude - minValue) / range
-                            let y = geometry.size.height * (1 - CGFloat(normalized))
+    private let horizontalInset: CGFloat = 5
+    private let verticalInset: CGFloat = 5
 
-                            if index == 0 {
-                                path.move(to: CGPoint(x: x, y: y))
-                            } else {
-                                path.addLine(to: CGPoint(x: x, y: y))
+    var body: some View {
+        let dateRange = chartDateRange(for: samples.map(\.date), timeWindow: timeWindow)
+        let visibleSamples = samples.filter { sample in
+            sample.date >= dateRange.lowerBound && sample.date <= dateRange.upperBound
+        }
+        let scale = chartValueScale(for: visibleSamples.map(\.value))
+
+        VStack(spacing: 1) {
+            labelRow(scale: scale, dateRange: dateRange, isTop: true)
+
+            GeometryReader { geometry in
+                let plotShape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+
+                ZStack {
+                    plotShape
+                        .fill(.white.opacity(0.06))
+
+                    if let scale, visibleSamples.count >= 2 {
+                        Path { path in
+                            for (index, sample) in visibleSamples.enumerated() {
+                                let position = chartPoint(
+                                    date: sample.date,
+                                    value: sample.value,
+                                    dateRange: dateRange,
+                                    scale: scale,
+                                    size: geometry.size,
+                                    horizontalInset: horizontalInset,
+                                    verticalInset: verticalInset
+                                )
+
+                                if index == 0 {
+                                    path.move(to: position)
+                                } else {
+                                    path.addLine(to: position)
+                                }
                             }
                         }
+                        .stroke(tint, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                        .clipShape(plotShape)
+                    } else if let scale, let sample = visibleSamples.first {
+                        Circle()
+                            .fill(tint)
+                            .frame(width: 4, height: 4)
+                            .position(
+                                chartPoint(
+                                    date: sample.date,
+                                    value: sample.value,
+                                    dateRange: dateRange,
+                                    scale: scale,
+                                    size: geometry.size,
+                                    horizontalInset: horizontalInset,
+                                    verticalInset: verticalInset
+                                )
+                            )
+                    } else {
+                        Path { path in
+                            let y = geometry.size.height / 2
+                            path.move(to: CGPoint(x: horizontalInset, y: y))
+                            path.addLine(to: CGPoint(x: geometry.size.width - horizontalInset, y: y))
+                        }
+                        .stroke(.white.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                     }
-                    .stroke(tint, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 6)
-
-                    chartLabels(
-                        top: "\(Int((altitudePoints.compactMap(\.chartAltitudeMeters).max() ?? 0).rounded()))m",
-                        start: altitudePoints.first?.date,
-                        end: altitudePoints.last?.date
-                    )
-                } else {
-                    Path { path in
-                        let y = geometry.size.height / 2
-                        path.move(to: CGPoint(x: 6, y: y))
-                        path.addLine(to: CGPoint(x: geometry.size.width - 6, y: y))
-                    }
-                    .stroke(.white.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                 }
             }
+            .frame(height: plotHeight)
+
+            labelRow(scale: scale, dateRange: dateRange, isTop: false)
         }
-        .frame(height: 30)
-        .accessibilityLabel("海拔趋势")
+        .accessibilityLabel(accessibilityLabel)
     }
 
-    private func chartLabels(top: String, start: Date?, end: Date?) -> some View {
-        ZStack {
-            Text(top)
-                .font(.system(size: 7, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .padding(.top, 2)
-                .padding(.trailing, 4)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-
-            if let start, let end, end.timeIntervalSince(start) > 60 {
-                HStack {
-                    Text(start.clockText())
+    @ViewBuilder
+    private func labelRow(scale: TrendValueScale?, dateRange: ClosedRange<Date>, isTop: Bool) -> some View {
+        if let scale {
+            HStack(spacing: 4) {
+                if isTop {
                     Spacer(minLength: 0)
-                    Text(end.clockText())
+                    Text(valueFormatter(scale.upperBound))
+                } else {
+                    Text(valueFormatter(scale.lowerBound))
+                    Spacer(minLength: 0)
+                    if dateRange.upperBound.timeIntervalSince(dateRange.lowerBound) > 60 {
+                        Text("\(dateFormatter(dateRange.lowerBound))-\(dateFormatter(dateRange.upperBound))")
+                    }
                 }
-                .font(.system(size: 7, weight: .medium, design: .monospaced))
-                .foregroundStyle(.secondary.opacity(0.85))
-                .padding(.horizontal, 4)
-                .padding(.bottom, 1)
-                .frame(maxHeight: .infinity, alignment: .bottom)
             }
+            .font(.system(size: 7, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(.secondary.opacity(0.9))
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
         }
     }
 }
 
-private func chartDateRange(for dates: [Date]) -> ClosedRange<Date> {
+private struct TrendValueScale {
+    let lowerBound: Double
+    let upperBound: Double
+
+    var isFlat: Bool {
+        upperBound == lowerBound
+    }
+
+    var range: Double {
+        max(upperBound - lowerBound, 0.0001)
+    }
+}
+
+private func chartDateRange(for dates: [Date], timeWindow: TimeInterval?) -> ClosedRange<Date> {
+    if let timeWindow {
+        let end = Date()
+        return end.addingTimeInterval(-timeWindow)...end
+    }
+
     guard let start = dates.min(), let end = dates.max(), end > start else {
         let now = Date()
         return now...now.addingTimeInterval(1)
@@ -1840,10 +1726,32 @@ private func chartDateRange(for dates: [Date]) -> ClosedRange<Date> {
     return start...end
 }
 
-private func chartX(for date: Date, in range: ClosedRange<Date>, width: CGFloat) -> CGFloat {
+private func chartValueScale(for values: [Double]) -> TrendValueScale? {
+    guard let minValue = values.min(), let maxValue = values.max() else { return nil }
+    return TrendValueScale(lowerBound: minValue, upperBound: maxValue)
+}
+
+private func chartPoint(
+    date: Date,
+    value: Double,
+    dateRange: ClosedRange<Date>,
+    scale: TrendValueScale,
+    size: CGSize,
+    horizontalInset: CGFloat,
+    verticalInset: CGFloat
+) -> CGPoint {
+    let x = chartX(for: date, in: dateRange, width: size.width, inset: horizontalInset)
+    let normalized = scale.isFlat ? 0.5 : min(max((value - scale.lowerBound) / scale.range, 0), 1)
+    let drawableHeight = max(size.height - verticalInset * 2, 1)
+    let y = verticalInset + drawableHeight * (1 - CGFloat(normalized))
+    return CGPoint(x: x, y: y)
+}
+
+private func chartX(for date: Date, in range: ClosedRange<Date>, width: CGFloat, inset: CGFloat) -> CGFloat {
     let duration = max(range.upperBound.timeIntervalSince(range.lowerBound), 1)
     let position = date.timeIntervalSince(range.lowerBound) / duration
-    return width * CGFloat(min(max(position, 0), 1))
+    let drawableWidth = max(width - inset * 2, 1)
+    return inset + drawableWidth * CGFloat(min(max(position, 0), 1))
 }
 
 private struct TrendPanel<Content: View>: View {

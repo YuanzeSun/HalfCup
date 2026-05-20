@@ -95,8 +95,8 @@ struct PlanetVisibility: Identifiable, Equatable {
 
     func summaryText(calendar: Calendar) -> String {
         if let altitudeDegrees, altitudeDegrees > 0 {
-            let direction = azimuthText ?? "方位 N/A"
-            return "\(direction) · \(altitudeDegrees)° High"
+            let direction = azimuthText ?? "N/A"
+            return "\(direction) · \(altitudeDegrees)° H"
         }
 
         if let riseTime {
@@ -152,8 +152,8 @@ struct AstroForecast: Equatable {
         guard let planet = visiblePlanets.first else { return moonComplicationLine }
 
         if let altitudeDegrees = planet.altitudeDegrees, altitudeDegrees > 0 {
-            let direction = planet.azimuthText ?? "方位 N/A"
-            return "\(planet.name) \(direction) · \(altitudeDegrees)° High"
+            let direction = planet.azimuthText ?? "N/A"
+            return "\(planet.name) \(direction) · \(altitudeDegrees)° H"
         }
 
         if let riseTime = planet.riseTime {
@@ -265,20 +265,7 @@ final class AstroStore {
     }
 
     private func cloudErrorMessage(_ error: Error) -> String {
-        guard let urlError = error as? URLError else {
-            return "云量不可用"
-        }
-
-        switch urlError.code {
-        case .notConnectedToInternet, .networkConnectionLost:
-            return "云量网络失败"
-        case .timedOut:
-            return "云量超时"
-        case .badServerResponse, .cannotParseResponse:
-            return "云量接口失败"
-        default:
-            return "云量不可用"
-        }
+        "N/A"
     }
 }
 
@@ -318,7 +305,10 @@ private final class WeatherProvider {
             throw URLError(.badURL)
         }
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 8
+
+        let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse,
               200..<300 ~= httpResponse.statusCode
         else {
@@ -1038,7 +1028,7 @@ enum AstroCalculator {
                 id: planet.name,
                 name: planet.name,
                 altitudeDegrees: Int(horizontal.altitude.rounded()),
-                azimuthText: bearingText(horizontal.azimuth),
+                azimuthText: compactBearingText(horizontal.azimuth),
                 riseTime: riseTime,
                 bestObservationTime: bestTime
             )
@@ -1122,20 +1112,19 @@ enum AstroCalculator {
     private static func nextMoonRiseSet(after date: Date, site: ObservationSite) -> (rise: Date?, set: Date?) {
         let start = date.addingTimeInterval(-10 * 60)
         var previousDate = start
-        var previousAltitude = moonPosition(at: start, site: site).altitude
+        var previousAltitude = moonHorizonValue(at: start, site: site)
         var rise: Date?
         var set: Date?
 
-        for minute in stride(from: 10, through: 36 * 60, by: 10) {
+        for minute in stride(from: 5, through: 36 * 60, by: 5) {
             let currentDate = start.addingTimeInterval(Double(minute) * 60)
-            let currentAltitude = moonPosition(at: currentDate, site: site).altitude
+            let currentAltitude = moonHorizonValue(at: currentDate, site: site)
 
             if rise == nil, previousAltitude < 0, currentAltitude >= 0 {
-                let crossing = interpolatedCrossing(
+                let crossing = refinedMoonHorizonCrossing(
                     previousDate: previousDate,
-                    previousAltitude: previousAltitude,
                     currentDate: currentDate,
-                    currentAltitude: currentAltitude
+                    site: site
                 )
                 if crossing >= date {
                     rise = crossing
@@ -1143,11 +1132,10 @@ enum AstroCalculator {
             }
 
             if set == nil, previousAltitude >= 0, currentAltitude < 0 {
-                let crossing = interpolatedCrossing(
+                let crossing = refinedMoonHorizonCrossing(
                     previousDate: previousDate,
-                    previousAltitude: previousAltitude,
                     currentDate: currentDate,
-                    currentAltitude: currentAltitude
+                    site: site
                 )
                 if crossing >= date {
                     set = crossing
@@ -1156,6 +1144,51 @@ enum AstroCalculator {
 
             previousDate = currentDate
             previousAltitude = currentAltitude
+        }
+
+        return (rise, set)
+    }
+
+    private static func moonRiseSet(on date: Date, site: ObservationSite) -> (rise: Date?, set: Date?) {
+        let calendar = site.solarCalendar
+        let dayStart = calendar.startOfDay(for: date)
+        let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart.addingTimeInterval(24 * 60 * 60)
+        let searchStart = dayStart.addingTimeInterval(-60 * 60)
+        let searchEnd = dayEnd.addingTimeInterval(60 * 60)
+        var previousDate = searchStart
+        var previousAltitude = moonHorizonValue(at: searchStart, site: site)
+        var rise: Date?
+        var set: Date?
+        var currentDate = searchStart.addingTimeInterval(5 * 60)
+
+        while currentDate <= searchEnd {
+            let currentAltitude = moonHorizonValue(at: currentDate, site: site)
+
+            if rise == nil, previousAltitude < 0, currentAltitude >= 0 {
+                let crossing = refinedMoonHorizonCrossing(
+                    previousDate: previousDate,
+                    currentDate: currentDate,
+                    site: site
+                )
+                if crossing >= dayStart, crossing < dayEnd {
+                    rise = crossing
+                }
+            }
+
+            if set == nil, previousAltitude >= 0, currentAltitude < 0 {
+                let crossing = refinedMoonHorizonCrossing(
+                    previousDate: previousDate,
+                    currentDate: currentDate,
+                    site: site
+                )
+                if crossing >= dayStart, crossing < dayEnd {
+                    set = crossing
+                }
+            }
+
+            previousDate = currentDate
+            previousAltitude = currentAltitude
+            currentDate = currentDate.addingTimeInterval(5 * 60)
         }
 
         return (rise, set)
@@ -1256,21 +1289,38 @@ enum AstroCalculator {
         }
     }
 
-    private static func moonPosition(at date: Date, site: ObservationSite) -> (altitude: Double, azimuth: Double) {
+    private static func moonPosition(at date: Date, site: ObservationSite) -> (altitude: Double, azimuth: Double, distanceEarthRadii: Double) {
         let equatorial = moonEquatorialPosition(at: date)
+        let distance = max(equatorial.distanceEarthRadii, 1)
         let localSiderealTime = degreesToRadians(normalizedDegrees(greenwichSiderealTime(at: date) * 15 + site.longitude))
-        let hourAngle = localSiderealTime - equatorial.rightAscension
         let latitudeRadians = degreesToRadians(site.latitude)
-        let altitude = asin(
-            sin(equatorial.declination) * sin(latitudeRadians)
-                + cos(equatorial.declination) * cos(latitudeRadians) * cos(hourAngle)
-        )
-        let azimuth = atan2(
-            -sin(hourAngle),
-            tan(equatorial.declination) * cos(latitudeRadians) - sin(latitudeRadians) * cos(hourAngle)
+
+        let geocentricX = distance * cos(equatorial.declination) * cos(equatorial.rightAscension)
+        let geocentricY = distance * cos(equatorial.declination) * sin(equatorial.rightAscension)
+        let geocentricZ = distance * sin(equatorial.declination)
+
+        let geocentricLatitude = atan(0.99664719 * tan(latitudeRadians))
+        let observerX = cos(geocentricLatitude) * cos(localSiderealTime)
+        let observerY = cos(geocentricLatitude) * sin(localSiderealTime)
+        let observerZ = 0.99664719 * sin(geocentricLatitude)
+
+        let topocentricX = geocentricX - observerX
+        let topocentricY = geocentricY - observerY
+        let topocentricZ = geocentricZ - observerZ
+        let topocentricRightAscension = atan2(topocentricY, topocentricX)
+        let topocentricDeclination = atan2(
+            topocentricZ,
+            sqrt(topocentricX * topocentricX + topocentricY * topocentricY)
         )
 
-        return (radiansToDegrees(altitude), normalizedDegrees(radiansToDegrees(azimuth)))
+        let horizontal = horizontalCoordinates(
+            rightAscension: topocentricRightAscension,
+            declination: topocentricDeclination,
+            at: date,
+            site: site
+        )
+
+        return (horizontal.altitude, horizontal.azimuth, distance)
     }
 
     private static func moonHourAngle(at date: Date, site: ObservationSite) -> Double {
@@ -1279,24 +1329,91 @@ enum AstroCalculator {
         return normalizedRadians(localSiderealTime - equatorial.rightAscension)
     }
 
-    private static func moonEquatorialPosition(at date: Date) -> (rightAscension: Double, declination: Double) {
+    private static func moonHorizonValue(at date: Date, site: ObservationSite) -> Double {
+        let position = moonPosition(at: date, site: site)
+        let horizontalParallax = radiansToDegrees(asin(1 / max(position.distanceEarthRadii, 1)))
+        let apparentRadius = 0.2725 * horizontalParallax
+        let refraction = 0.5667
+        return position.altitude + refraction + apparentRadius
+    }
+
+    private static func refinedMoonHorizonCrossing(
+        previousDate: Date,
+        currentDate: Date,
+        site: ObservationSite
+    ) -> Date {
+        var lowerDate = previousDate
+        var upperDate = currentDate
+        var lowerValue = moonHorizonValue(at: lowerDate, site: site)
+
+        for _ in 0..<12 {
+            let midpoint = lowerDate.addingTimeInterval(upperDate.timeIntervalSince(lowerDate) / 2)
+            let midpointValue = moonHorizonValue(at: midpoint, site: site)
+
+            if (lowerValue < 0 && midpointValue >= 0) || (lowerValue >= 0 && midpointValue < 0) {
+                upperDate = midpoint
+            } else {
+                lowerDate = midpoint
+                lowerValue = midpointValue
+            }
+        }
+
+        return lowerDate.addingTimeInterval(upperDate.timeIntervalSince(lowerDate) / 2)
+    }
+
+    private static func moonEquatorialPosition(at date: Date) -> (rightAscension: Double, declination: Double, distanceEarthRadii: Double) {
         let d = julianDay(for: date) - 2_451_543.5
-        let node = degreesToRadians(normalizedDegrees(125.1228 - 0.0529538083 * d))
+        let nodeDegrees = normalizedDegrees(125.1228 - 0.0529538083 * d)
+        let perigeeDegrees = normalizedDegrees(318.0634 + 0.1643573223 * d)
+        let meanAnomalyDegrees = normalizedDegrees(115.3654 + 13.0649929509 * d)
+        let node = degreesToRadians(nodeDegrees)
         let inclination = degreesToRadians(5.1454)
-        let perigee = degreesToRadians(normalizedDegrees(318.0634 + 0.1643573223 * d))
+        let perigee = degreesToRadians(perigeeDegrees)
         let eccentricity = 0.0549
-        let meanAnomaly = degreesToRadians(normalizedDegrees(115.3654 + 13.0649929509 * d))
+        let meanAnomaly = degreesToRadians(meanAnomalyDegrees)
         let eccentricAnomaly = meanAnomaly + eccentricity * sin(meanAnomaly) * (1 + eccentricity * cos(meanAnomaly))
         let xv = cos(eccentricAnomaly) - eccentricity
         let yv = sqrt(1 - eccentricity * eccentricity) * sin(eccentricAnomaly)
         let trueAnomaly = atan2(yv, xv)
-        let radius = sqrt(xv * xv + yv * yv)
+        let radius = 60.2666 * sqrt(xv * xv + yv * yv)
 
         let xh = radius * (cos(node) * cos(trueAnomaly + perigee) - sin(node) * sin(trueAnomaly + perigee) * cos(inclination))
         let yh = radius * (sin(node) * cos(trueAnomaly + perigee) + cos(node) * sin(trueAnomaly + perigee) * cos(inclination))
         let zh = radius * sin(trueAnomaly + perigee) * sin(inclination)
-        let longitude = atan2(yh, xh)
-        let latitude = atan2(zh, sqrt(xh * xh + yh * yh))
+        var longitudeDegrees = normalizedDegrees(radiansToDegrees(atan2(yh, xh)))
+        var latitudeDegrees = radiansToDegrees(atan2(zh, sqrt(xh * xh + yh * yh)))
+        var distance = radius
+
+        let sunMeanAnomaly = normalizedDegrees(356.0470 + 0.9856002585 * d)
+        let sunMeanLongitude = normalizedDegrees(sunMeanAnomaly + 282.9404 + 4.70935e-5 * d)
+        let moonMeanLongitude = normalizedDegrees(nodeDegrees + perigeeDegrees + meanAnomalyDegrees)
+        let elongation = normalizedDegrees(moonMeanLongitude - sunMeanLongitude)
+        let argumentOfLatitude = normalizedDegrees(moonMeanLongitude - nodeDegrees)
+
+        longitudeDegrees += -1.274 * sinDegrees(meanAnomalyDegrees - 2 * elongation)
+            + 0.658 * sinDegrees(2 * elongation)
+            - 0.186 * sinDegrees(sunMeanAnomaly)
+            - 0.059 * sinDegrees(2 * meanAnomalyDegrees - 2 * elongation)
+            - 0.057 * sinDegrees(meanAnomalyDegrees - 2 * elongation + sunMeanAnomaly)
+            + 0.053 * sinDegrees(meanAnomalyDegrees + 2 * elongation)
+            + 0.046 * sinDegrees(2 * elongation - sunMeanAnomaly)
+            + 0.041 * sinDegrees(meanAnomalyDegrees - sunMeanAnomaly)
+            - 0.035 * sinDegrees(elongation)
+            - 0.031 * sinDegrees(meanAnomalyDegrees + sunMeanAnomaly)
+            - 0.015 * sinDegrees(2 * argumentOfLatitude - 2 * elongation)
+            + 0.011 * sinDegrees(meanAnomalyDegrees - 4 * elongation)
+
+        latitudeDegrees += -0.173 * sinDegrees(argumentOfLatitude - 2 * elongation)
+            - 0.055 * sinDegrees(meanAnomalyDegrees - argumentOfLatitude - 2 * elongation)
+            - 0.046 * sinDegrees(meanAnomalyDegrees + argumentOfLatitude - 2 * elongation)
+            + 0.033 * sinDegrees(argumentOfLatitude + 2 * elongation)
+            + 0.017 * sinDegrees(2 * meanAnomalyDegrees + argumentOfLatitude)
+
+        distance += -0.58 * cosDegrees(meanAnomalyDegrees - 2 * elongation)
+            - 0.46 * cosDegrees(2 * elongation)
+
+        let longitude = degreesToRadians(normalizedDegrees(longitudeDegrees))
+        let latitude = degreesToRadians(latitudeDegrees)
         let obliquity = degreesToRadians(23.4393 - 3.563e-7 * d)
         let xe = cos(longitude) * cos(latitude)
         let ye = sin(longitude) * cos(latitude) * cos(obliquity) - sin(latitude) * sin(obliquity)
@@ -1304,7 +1421,7 @@ enum AstroCalculator {
         let rightAscension = atan2(ye, xe)
         let declination = atan2(ze, sqrt(xe * xe + ye * ye))
 
-        return (rightAscension, declination)
+        return (rightAscension, declination, distance)
     }
 
     private static func planetEquatorialPosition(
@@ -1495,6 +1612,38 @@ enum AstroCalculator {
         }
     }
 
+    private static func compactBearingText(_ degrees: Double) -> String {
+        let degrees = normalizedDegrees(degrees)
+        let directions: [(label: String, angle: Double)] = [
+            ("N", 0),
+            ("E", 90),
+            ("S", 180),
+            ("W", 270)
+        ]
+
+        if let nearest = directions.min(by: {
+            angularDistance(degrees, $0.angle) < angularDistance(degrees, $1.angle)
+        }), angularDistance(degrees, nearest.angle) < 20 {
+            return nearest.label
+        }
+
+        switch degrees {
+        case 0..<90:
+            return "NE"
+        case 90..<180:
+            return "ES"
+        case 180..<270:
+            return "SW"
+        default:
+            return "WN"
+        }
+    }
+
+    private static func angularDistance(_ lhs: Double, _ rhs: Double) -> Double {
+        let delta = abs(normalizedDegrees(lhs - rhs))
+        return min(delta, 360 - delta)
+    }
+
     private static func bearingText(
         primary: String,
         secondary: String,
@@ -1534,5 +1683,13 @@ enum AstroCalculator {
 
     private static func radiansToDegrees(_ radians: Double) -> Double {
         radians * 180 / .pi
+    }
+
+    private static func sinDegrees(_ degrees: Double) -> Double {
+        sin(degreesToRadians(degrees))
+    }
+
+    private static func cosDegrees(_ degrees: Double) -> Double {
+        cos(degreesToRadians(degrees))
     }
 }

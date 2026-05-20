@@ -34,6 +34,8 @@ struct BarometerPoint: Identifiable, Equatable {
 
 @Observable
 final class BarometerStore {
+    static let realtimeTrendInterval: TimeInterval = 2 * 60
+
     private(set) var pressureHectopascals: Double?
     private(set) var absoluteAltitudeMeters: Double?
     private(set) var altitudeAccuracyMeters: Double?
@@ -67,13 +69,17 @@ final class BarometerStore {
         return String(format: "%.1f", pressureHectopascals)
     }
 
-    var altitudeText: String {
+    var altitudeValueText: String {
         if let absoluteAltitudeMeters {
-            return String(format: "%.0f m", absoluteAltitudeMeters)
+            return String(format: "%.0f", absoluteAltitudeMeters)
         }
 
         guard let relativeAltitudeMeters else { return "N/A" }
-        return String(format: "%+.1f m", relativeAltitudeMeters)
+        return String(format: "%+.1f", relativeAltitudeMeters)
+    }
+
+    var altitudeText: String {
+        altitudeValueText == "N/A" ? "N/A" : "\(altitudeValueText) m"
     }
 
     var altitudeLabel: String {
@@ -227,7 +233,7 @@ final class BarometerStore {
             )
         )
 
-        let cutoff = date.addingTimeInterval(-HalfCupHistoryStore.retentionInterval)
+        let cutoff = date.addingTimeInterval(-Self.realtimeTrendInterval)
         pressureTrend.removeAll { $0.date < cutoff }
 
         if shouldPersistHistorySample(at: date) {
@@ -249,11 +255,11 @@ final class BarometerStore {
     private static func previewTrend() -> [BarometerPoint] {
         let now = Date()
         return (0..<18).map { index in
-            let offset = Double(index - 17)
+            let offset = Double(index - 17) * 7
             let pressure = 1012.8 + sin(Double(index) / 2.6) * 2.4 + offset * 0.08
             let altitude = 8.4 + sin(Double(index) / 2.1) * 1.8 + offset * 0.04
             return BarometerPoint(
-                date: now.addingTimeInterval(offset * 90),
+                date: now.addingTimeInterval(offset),
                 pressureHectopascals: pressure,
                 absoluteAltitudeMeters: altitude,
                 relativeAltitudeMeters: altitude - 8.4
