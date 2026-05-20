@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>WKApplication</key>
+    <true/>
+    <key>WKWatchOnly</key>
+    <true/>
+    <key>NSHealthShareUsageDescription</key>
+    <string>HalfCup 需要读取 HRV、心率、训练、VO2max 和睡眠数据，用于显示压力、训练状态和恢复建议。</string>
+    <key>NSMotionUsageDescription</key>
+    <string>HalfCup 需要读取气压计和海拔数据，用于显示实时气压、绝对海拔和观测环境变化。</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>HalfCup 需要使用当前位置，用于显示经纬度并估算日落、月亮高度、实时云量和观星窗口。</string>
+</dict>
+</plist>

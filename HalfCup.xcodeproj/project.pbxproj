@@ -8,6 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		811F7B642FBCE215006D6E45 /* HalfCup Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 811F7B632FBCE215006D6E45 /* HalfCup Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		8142FD882FBCFF560089AEE4 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8142FD872FBCFF550089AEE4 /* WidgetKit.framework */; };
+		8142FD8A2FBCFF560089AEE4 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8142FD892FBCFF560089AEE4 /* SwiftUI.framework */; };
+		8142FD992FBCFF590089AEE4 /* HalfCupWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8142FD852FBCFF550089AEE4 /* HalfCupWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		8142FDAA2FBCFFB60089AEE4 /* HalfCupNot.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8142FDA32FBCFFB60089AEE4 /* HalfCupNot.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,6 +36,20 @@
 			remoteGlobalIDString = 811F7B622FBCE215006D6E45;
 			remoteInfo = "HalfCup Watch App";
 		};
+		8142FD972FBCFF590089AEE4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 811F7B572FBCE214006D6E45 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8142FD842FBCFF550089AEE4;
+			remoteInfo = HalfCupWidgetExtension;
+		};
+		8142FDA82FBCFFB60089AEE4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 811F7B572FBCE214006D6E45 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8142FDA22FBCFFB60089AEE4;
+			remoteInfo = HalfCupNot;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -46,6 +64,18 @@
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8142FD9E2FBCFF590089AEE4 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				8142FDAA2FBCFFB60089AEE4 /* HalfCupNot.appex in Embed Foundation Extensions */,
+				8142FD992FBCFF590089AEE4 /* HalfCupWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -53,7 +83,30 @@
 		811F7B632FBCE215006D6E45 /* HalfCup Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "HalfCup Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		811F7B722FBCE217006D6E45 /* HalfCup Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "HalfCup Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		811F7B7C2FBCE217006D6E45 /* HalfCup Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "HalfCup Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		8142FD852FBCFF550089AEE4 /* HalfCupWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HalfCupWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		8142FD872FBCFF550089AEE4 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		8142FD892FBCFF560089AEE4 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		8142FDA32FBCFFB60089AEE4 /* HalfCupNot.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HalfCupNot.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		81D183572FBD88B900A36305 /* HalfCupWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HalfCupWidgetExtension.entitlements; sourceTree = "<group>"; };
+		81D183592FBD88BA00A36305 /* WeatherKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WeatherKit.framework; path = System/Library/Frameworks/WeatherKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		8142FD9A2FBCFF590089AEE4 /* Exceptions for "HalfCupWidget" folder in "HalfCupWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 8142FD842FBCFF550089AEE4 /* HalfCupWidgetExtension */;
+		};
+		8142FDAB2FBCFFB60089AEE4 /* Exceptions for "HalfCupNot" folder in "HalfCupNot" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 8142FDA22FBCFFB60089AEE4 /* HalfCupNot */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		811F7B672FBCE215006D6E45 /* HalfCup Watch App */ = {
@@ -69,6 +122,22 @@
 		811F7B7F2FBCE217006D6E45 /* HalfCup Watch AppUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "HalfCup Watch AppUITests";
+			sourceTree = "<group>";
+		};
+		8142FD8B2FBCFF560089AEE4 /* HalfCupWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				8142FD9A2FBCFF590089AEE4 /* Exceptions for "HalfCupWidget" folder in "HalfCupWidgetExtension" target */,
+			);
+			path = HalfCupWidget;
+			sourceTree = "<group>";
+		};
+		8142FDA42FBCFFB60089AEE4 /* HalfCupNot */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				8142FDAB2FBCFFB60089AEE4 /* Exceptions for "HalfCupNot" folder in "HalfCupNot" target */,
+			);
+			path = HalfCupNot;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -95,15 +164,35 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8142FD822FBCFF550089AEE4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8142FD8A2FBCFF560089AEE4 /* SwiftUI.framework in Frameworks */,
+				8142FD882FBCFF560089AEE4 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8142FDA02FBCFFB60089AEE4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		811F7B562FBCE214006D6E45 = {
 			isa = PBXGroup;
 			children = (
+				81D183572FBD88B900A36305 /* HalfCupWidgetExtension.entitlements */,
 				811F7B672FBCE215006D6E45 /* HalfCup Watch App */,
 				811F7B752FBCE217006D6E45 /* HalfCup Watch AppTests */,
 				811F7B7F2FBCE217006D6E45 /* HalfCup Watch AppUITests */,
+				8142FD8B2FBCFF560089AEE4 /* HalfCupWidget */,
+				8142FDA42FBCFFB60089AEE4 /* HalfCupNot */,
+				8142FD862FBCFF550089AEE4 /* Frameworks */,
 				811F7B5E2FBCE215006D6E45 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -115,8 +204,20 @@
 				811F7B632FBCE215006D6E45 /* HalfCup Watch App.app */,
 				811F7B722FBCE217006D6E45 /* HalfCup Watch AppTests.xctest */,
 				811F7B7C2FBCE217006D6E45 /* HalfCup Watch AppUITests.xctest */,
+				8142FD852FBCFF550089AEE4 /* HalfCupWidgetExtension.appex */,
+				8142FDA32FBCFFB60089AEE4 /* HalfCupNot.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		8142FD862FBCFF550089AEE4 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				81D183592FBD88BA00A36305 /* WeatherKit.framework */,
+				8142FD872FBCFF550089AEE4 /* WidgetKit.framework */,
+				8142FD892FBCFF560089AEE4 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -148,10 +249,13 @@
 				811F7B5F2FBCE215006D6E45 /* Sources */,
 				811F7B602FBCE215006D6E45 /* Frameworks */,
 				811F7B612FBCE215006D6E45 /* Resources */,
+				8142FD9E2FBCFF590089AEE4 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				8142FD982FBCFF590089AEE4 /* PBXTargetDependency */,
+				8142FDA92FBCFFB60089AEE4 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				811F7B672FBCE215006D6E45 /* HalfCup Watch App */,
@@ -209,6 +313,50 @@
 			productReference = 811F7B7C2FBCE217006D6E45 /* HalfCup Watch AppUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		8142FD842FBCFF550089AEE4 /* HalfCupWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8142FD9B2FBCFF590089AEE4 /* Build configuration list for PBXNativeTarget "HalfCupWidgetExtension" */;
+			buildPhases = (
+				8142FD812FBCFF550089AEE4 /* Sources */,
+				8142FD822FBCFF550089AEE4 /* Frameworks */,
+				8142FD832FBCFF550089AEE4 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				8142FD8B2FBCFF560089AEE4 /* HalfCupWidget */,
+			);
+			name = HalfCupWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = HalfCupWidgetExtension;
+			productReference = 8142FD852FBCFF550089AEE4 /* HalfCupWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		8142FDA22FBCFFB60089AEE4 /* HalfCupNot */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8142FDAC2FBCFFB60089AEE4 /* Build configuration list for PBXNativeTarget "HalfCupNot" */;
+			buildPhases = (
+				8142FD9F2FBCFFB60089AEE4 /* Sources */,
+				8142FDA02FBCFFB60089AEE4 /* Frameworks */,
+				8142FDA12FBCFFB60089AEE4 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				8142FDA42FBCFFB60089AEE4 /* HalfCupNot */,
+			);
+			name = HalfCupNot;
+			packageProductDependencies = (
+			);
+			productName = HalfCupNot;
+			productReference = 8142FDA32FBCFFB60089AEE4 /* HalfCupNot.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -224,6 +372,11 @@
 					};
 					811F7B622FBCE215006D6E45 = {
 						CreatedOnToolsVersion = 26.5;
+						SystemCapabilities = {
+							com.apple.WeatherKit = {
+								enabled = 1;
+							};
+						};
 					};
 					811F7B712FBCE217006D6E45 = {
 						CreatedOnToolsVersion = 26.5;
@@ -232,6 +385,12 @@
 					811F7B7B2FBCE217006D6E45 = {
 						CreatedOnToolsVersion = 26.5;
 						TestTargetID = 811F7B622FBCE215006D6E45;
+					};
+					8142FD842FBCFF550089AEE4 = {
+						CreatedOnToolsVersion = 26.5;
+					};
+					8142FDA22FBCFFB60089AEE4 = {
+						CreatedOnToolsVersion = 26.5;
 					};
 				};
 			};
@@ -253,6 +412,8 @@
 				811F7B622FBCE215006D6E45 /* HalfCup Watch App */,
 				811F7B712FBCE217006D6E45 /* HalfCup Watch AppTests */,
 				811F7B7B2FBCE217006D6E45 /* HalfCup Watch AppUITests */,
+				8142FD842FBCFF550089AEE4 /* HalfCupWidgetExtension */,
+				8142FDA22FBCFFB60089AEE4 /* HalfCupNot */,
 			);
 		};
 /* End PBXProject section */
@@ -286,6 +447,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8142FD832FBCFF550089AEE4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8142FDA12FBCFFB60089AEE4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -310,6 +485,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8142FD812FBCFF550089AEE4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8142FD9F2FBCFFB60089AEE4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -327,6 +516,16 @@
 			isa = PBXTargetDependency;
 			target = 811F7B622FBCE215006D6E45 /* HalfCup Watch App */;
 			targetProxy = 811F7B7D2FBCE217006D6E45 /* PBXContainerItemProxy */;
+		};
+		8142FD982FBCFF590089AEE4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8142FD842FBCFF550089AEE4 /* HalfCupWidgetExtension */;
+			targetProxy = 8142FD972FBCFF590089AEE4 /* PBXContainerItemProxy */;
+		};
+		8142FDA92FBCFFB60089AEE4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8142FDA22FBCFFB60089AEE4 /* HalfCupNot */;
+			targetProxy = 8142FDA82FBCFFB60089AEE4 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -450,11 +649,17 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "HalfCup Watch App/HalfCup Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N4655H23QR;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "HalfCup-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = HalfCup;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "HalfCup 需要读取 HRV、心率、训练、VO2max 和睡眠数据，用于显示压力、训练状态和恢复建议。";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "HalfCup 需要使用当前位置，用于显示经纬度并估算日落、月亮高度和观星窗口。";
+				INFOPLIST_KEY_NSMotionUsageDescription = "HalfCup 需要读取气压计和海拔数据，用于显示实时气压、绝对海拔和观测环境变化。";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKWatchOnly = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -462,6 +667,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				OTHER_CODE_SIGN_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.luca.HalfCup.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -482,11 +688,17 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "HalfCup Watch App/HalfCup Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N4655H23QR;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "HalfCup-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = HalfCup;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "HalfCup 需要读取 HRV、心率、训练、VO2max 和睡眠数据，用于显示压力、训练状态和恢复建议。";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "HalfCup 需要使用当前位置，用于显示经纬度并估算日落、月亮高度和观星窗口。";
+				INFOPLIST_KEY_NSMotionUsageDescription = "HalfCup 需要读取气压计和海拔数据，用于显示实时气压、绝对海拔和观测环境变化。";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKWatchOnly = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -494,6 +706,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				OTHER_CODE_SIGN_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.luca.HalfCup.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -515,6 +728,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N4655H23QR;
 				INFOPLIST_KEY_CFBundleDisplayName = HalfCup;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.luca.HalfCup;
@@ -531,6 +745,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N4655H23QR;
 				INFOPLIST_KEY_CFBundleDisplayName = HalfCup;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.luca.HalfCup;
@@ -631,6 +846,138 @@
 			};
 			name = Release;
 		};
+		8142FD9C2FBCFF590089AEE4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = HalfCupWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N4655H23QR;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HalfCupWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HalfCupWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.luca.HalfCup.watchkitapp.HalfCupWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Debug;
+		};
+		8142FD9D2FBCFF590089AEE4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = HalfCupWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N4655H23QR;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HalfCupWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HalfCupWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.luca.HalfCup.watchkitapp.HalfCupWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Release;
+		};
+		8142FDAD2FBCFFB60089AEE4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N4655H23QR;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HalfCupNot/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HalfCupNot;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.luca.HalfCup.watchkitapp.HalfCupNot;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Debug;
+		};
+		8142FDAE2FBCFFB60089AEE4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N4655H23QR;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HalfCupNot/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HalfCupNot;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.luca.HalfCup.watchkitapp.HalfCupNot;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -675,6 +1022,24 @@
 			buildConfigurations = (
 				811F7B912FBCE217006D6E45 /* Debug */,
 				811F7B922FBCE217006D6E45 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8142FD9B2FBCFF590089AEE4 /* Build configuration list for PBXNativeTarget "HalfCupWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8142FD9C2FBCFF590089AEE4 /* Debug */,
+				8142FD9D2FBCFF590089AEE4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8142FDAC2FBCFFB60089AEE4 /* Build configuration list for PBXNativeTarget "HalfCupNot" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8142FDAD2FBCFFB60089AEE4 /* Debug */,
+				8142FDAE2FBCFFB60089AEE4 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
