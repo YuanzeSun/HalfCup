@@ -78,6 +78,7 @@ struct HealthMetricDefinition: Identifiable {
     let quantityIdentifier: HKQuantityTypeIdentifier
     let unit: HKUnit
     let lookbackDays: Int
+    let staleAfter: TimeInterval?
     let query: HealthMetricQuery
     let formatter: (Double, Date) -> HealthMetricReading
 
@@ -259,6 +260,11 @@ final class HealthMetricsStore {
                 for: quantityType,
                 lookbackDays: definition.lookbackDays
             ) else {
+                return nil
+            }
+
+            if let staleAfter = definition.staleAfter,
+               Date().timeIntervalSince(sample.endDate) > staleAfter {
                 return nil
             }
 
@@ -509,9 +515,9 @@ final class HealthMetricsStore {
             return .waiting
         }
 
-        let heartRateText = readings.first(where: { $0.kind == .heartRate }).map {
-            "\($0.valueText) \($0.unitText)"
-        } ?? "N/A"
+        let heartRateText = formattedValueText(
+            readings.first { $0.kind == .heartRate }
+        ) ?? "N/A"
         let detail = "HRV \(Int(hrv.rounded())) ms · 心率 \(heartRateText)"
 
         switch hrv {
@@ -565,6 +571,11 @@ final class HealthMetricsStore {
         }
     }
 
+    private func formattedValueText(_ reading: HealthMetricReading?) -> String? {
+        guard let reading, reading.valueText != "N/A" else { return nil }
+        return reading.unitText.isEmpty ? reading.valueText : "\(reading.valueText) \(reading.unitText)"
+    }
+
     private static let definitions: [HealthMetricDefinition] = [
         HealthMetricDefinition(
             kind: .hrv,
@@ -574,6 +585,7 @@ final class HealthMetricsStore {
             quantityIdentifier: .heartRateVariabilitySDNN,
             unit: HKUnit.secondUnit(with: .milli),
             lookbackDays: 14,
+            staleAfter: HealthMetricsStore.hrvFreshnessInterval,
             query: .latest
         ) { value, date in
             let state: String
@@ -613,6 +625,7 @@ final class HealthMetricsStore {
             quantityIdentifier: .heartRate,
             unit: HKUnit.count().unitDivided(by: .minute()),
             lookbackDays: 1,
+            staleAfter: HealthMetricsStore.heartRateFreshnessInterval,
             query: .latest
         ) { value, date in
             HealthMetricReading(
@@ -634,6 +647,7 @@ final class HealthMetricsStore {
             quantityIdentifier: .restingHeartRate,
             unit: HKUnit.count().unitDivided(by: .minute()),
             lookbackDays: 14,
+            staleAfter: nil,
             query: .latest
         ) { value, date in
             HealthMetricReading(
@@ -655,6 +669,7 @@ final class HealthMetricsStore {
             quantityIdentifier: .walkingHeartRateAverage,
             unit: HKUnit.count().unitDivided(by: .minute()),
             lookbackDays: 30,
+            staleAfter: nil,
             query: .latest
         ) { value, date in
             HealthMetricReading(
@@ -676,6 +691,7 @@ final class HealthMetricsStore {
             quantityIdentifier: .heartRateRecoveryOneMinute,
             unit: HKUnit.count().unitDivided(by: .minute()),
             lookbackDays: 60,
+            staleAfter: nil,
             query: .latest
         ) { value, date in
             HealthMetricReading(
@@ -697,6 +713,7 @@ final class HealthMetricsStore {
             quantityIdentifier: .basalEnergyBurned,
             unit: HKUnit.kilocalorie(),
             lookbackDays: 1,
+            staleAfter: nil,
             query: .todaySum
         ) { value, date in
             HealthMetricReading(
@@ -718,6 +735,7 @@ final class HealthMetricsStore {
             quantityIdentifier: .activeEnergyBurned,
             unit: HKUnit.kilocalorie(),
             lookbackDays: 1,
+            staleAfter: nil,
             query: .todaySum
         ) { value, date in
             HealthMetricReading(
@@ -739,6 +757,7 @@ final class HealthMetricsStore {
             quantityIdentifier: .stepCount,
             unit: HKUnit.count(),
             lookbackDays: 1,
+            staleAfter: nil,
             query: .todaySum
         ) { value, date in
             HealthMetricReading(
@@ -760,6 +779,7 @@ final class HealthMetricsStore {
             quantityIdentifier: .distanceWalkingRunning,
             unit: HKUnit.meterUnit(with: .kilo),
             lookbackDays: 1,
+            staleAfter: nil,
             query: .todaySum
         ) { value, date in
             HealthMetricReading(
@@ -781,6 +801,7 @@ final class HealthMetricsStore {
             quantityIdentifier: .vo2Max,
             unit: vo2MaxUnit,
             lookbackDays: 365,
+            staleAfter: nil,
             query: .latest
         ) { value, date in
             HealthMetricReading(
@@ -799,6 +820,9 @@ final class HealthMetricsStore {
     private static let vo2MaxUnit = HKUnit.literUnit(with: .milli)
         .unitDivided(by: HKUnit.gramUnit(with: .kilo))
         .unitDivided(by: HKUnit.minute())
+
+    private static let heartRateFreshnessInterval: TimeInterval = 30 * 60
+    private static let hrvFreshnessInterval = HalfCupHistoryStore.retentionInterval
 
     private static func abbreviatedCount(_ value: Double) -> String {
         if value >= 10_000 {

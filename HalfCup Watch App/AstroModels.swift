@@ -13,8 +13,11 @@ struct ObservationSite: Equatable {
     let longitude: Double
     let cloudCoverPercent: Int?
     let bortleClass: Int?
+    let hasResolvedLocation: Bool
 
     var coordinateText: String {
+        guard hasResolvedLocation else { return "N/A" }
+
         let latitudeSuffix = latitude >= 0 ? "N" : "S"
         let longitudeSuffix = longitude >= 0 ? "E" : "W"
         return String(
@@ -38,7 +41,8 @@ struct ObservationSite: Equatable {
         latitude: 31.23,
         longitude: 121.47,
         cloudCoverPercent: nil,
-        bortleClass: nil
+        bortleClass: nil,
+        hasResolvedLocation: false
     )
 
     static func current(latitude: Double, longitude: Double) -> ObservationSite {
@@ -47,7 +51,8 @@ struct ObservationSite: Equatable {
             latitude: latitude,
             longitude: longitude,
             cloudCoverPercent: nil,
-            bortleClass: nil
+            bortleClass: nil,
+            hasResolvedLocation: true
         )
     }
 
@@ -57,7 +62,8 @@ struct ObservationSite: Equatable {
             latitude: latitude,
             longitude: longitude,
             cloudCoverPercent: min(max(cloudCoverPercent, 0), 100),
-            bortleClass: bortleClass
+            bortleClass: bortleClass,
+            hasResolvedLocation: hasResolvedLocation
         )
     }
 }
@@ -209,6 +215,11 @@ final class AstroStore {
 
     func refreshWeather() {
         let site = forecast.site
+        guard site.hasResolvedLocation else {
+            weatherStatusMessage = "云量 N/A"
+            return
+        }
+
         Task {
             await updateCloudCover(for: site)
         }
@@ -346,7 +357,7 @@ private final class LocationProvider: NSObject, CLLocationManagerDelegate {
 
         switch manager.authorizationStatus {
         case .notDetermined:
-            onStatus?("等待系统授权")
+            onStatus?("定位待授权")
             manager.requestWhenInUseAuthorization()
         case .authorizedAlways, .authorizedWhenInUse:
             onStatus?("定位中")
@@ -365,7 +376,7 @@ private final class LocationProvider: NSObject, CLLocationManagerDelegate {
         case .denied, .restricted:
             onStatus?("定位未授权")
         case .notDetermined:
-            break
+            onStatus?("定位待授权")
         @unknown default:
             onStatus?("定位不可用")
         }
