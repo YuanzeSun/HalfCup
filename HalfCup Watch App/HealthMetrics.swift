@@ -98,6 +98,7 @@ enum HealthMetricQuery {
 final class HealthMetricsStore {
     private(set) var readings: [HealthMetricReading]
     private(set) var hrvTrend: [HealthMetricPoint] = []
+    private(set) var heartRateTrend: [HealthMetricPoint] = []
     private(set) var dailyCalorieTrend: [HealthMetricPoint] = []
     private(set) var dailySleepTrend: [HealthMetricPoint] = []
     private(set) var stressSnapshot = HealthStressSnapshot.waiting
@@ -105,15 +106,17 @@ final class HealthMetricsStore {
     private(set) var statusMessage = "HRV 将自动更新"
 
     var hrvHistoryTrend: [HealthMetricPoint] {
-        HalfCupHistoryStore.hrvSamples().map {
+        let fallback = HalfCupHistoryStore.hrvSamples().map {
             HealthMetricPoint(date: $0.date, value: $0.value)
         }
+        return hrvTrend.isEmpty ? fallback : hrvTrend
     }
 
     var heartRateHistoryTrend: [HealthMetricPoint] {
-        HalfCupHistoryStore.heartRateSamples().map {
+        let fallback = HalfCupHistoryStore.heartRateSamples().map {
             HealthMetricPoint(date: $0.date, value: $0.value)
         }
+        return heartRateTrend.isEmpty ? fallback : heartRateTrend
     }
 
     var dashboardReadings: [HealthMetricReading] {
@@ -194,11 +197,13 @@ final class HealthMetricsStore {
         do {
             try await requestAuthorizationIfNeeded()
             let updatedReadings = try await fetchReadings()
-            let updatedTrend = try await fetchHRVTrend()
+            async let updatedHeartRateTrend = fetchHeartRateTrend()
+            async let updatedHRVTrend = fetchHRVTrend()
             let updatedDailyCalorieTrend = (try? await fetchDailyCalorieTrend()) ?? []
             let updatedDailySleepTrend = (try? await fetchDailySleepTrend()) ?? []
             readings = updatedReadings
-            hrvTrend = updatedTrend
+            heartRateTrend = (try? await updatedHeartRateTrend) ?? []
+            hrvTrend = (try? await updatedHRVTrend) ?? []
             dailyCalorieTrend = updatedDailyCalorieTrend
             dailySleepTrend = updatedDailySleepTrend
             stressSnapshot = makeStressSnapshot(from: updatedReadings)
@@ -285,14 +290,43 @@ final class HealthMetricsStore {
         return samples.first
     }
 
+    private func fetchHeartRateTrend() async throws -> [HealthMetricPoint] {
+        guard let quantityType = HKObjectType.quantityType(forIdentifier: .heartRate) else {
+            return []
+        }
+
+        let cutoff = Date().addingTimeInterval(-HalfCupHistoryStore.retentionInterval)
+        let samples = try await quantitySamples(
+            for: quantityType,
+            startDate: Date().addingTimeInterval(-Self.trendQueryLookbackInterval),
+            limit: HKObjectQueryNoLimit
+        )
+
+        return samples
+            .filter { $0.endDate >= cutoff }
+            .sorted { $0.endDate < $1.endDate }
+            .map { sample in
+                HealthMetricPoint(
+                    date: sample.endDate,
+                    value: sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+                )
+            }
+    }
+
     private func fetchHRVTrend() async throws -> [HealthMetricPoint] {
         guard let quantityType = HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN) else {
             return []
         }
 
-        let samples = try await quantitySamples(for: quantityType, lookbackDays: 14, limit: 12)
+        let cutoff = Date().addingTimeInterval(-HalfCupHistoryStore.retentionInterval)
+        let samples = try await quantitySamples(
+            for: quantityType,
+            startDate: Date().addingTimeInterval(-Self.trendQueryLookbackInterval),
+            limit: HKObjectQueryNoLimit
+        )
 
         return samples
+            .filter { $0.endDate >= cutoff }
             .sorted { $0.endDate < $1.endDate }
             .map { sample in
                 HealthMetricPoint(
@@ -823,6 +857,7 @@ final class HealthMetricsStore {
 
     private static let heartRateFreshnessInterval: TimeInterval = 30 * 60
     private static let hrvFreshnessInterval = HalfCupHistoryStore.retentionInterval
+    private static let trendQueryLookbackInterval: TimeInterval = 24 * 60 * 60
 
     private static func abbreviatedCount(_ value: Double) -> String {
         if value >= 10_000 {

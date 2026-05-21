@@ -162,12 +162,17 @@ struct ContentView: View {
             }
         case .barometer:
             BarometerCard(store: barometerStore)
+        case .weather:
+            WeatherCard(
+                snapshot: astroStore.weatherSnapshot,
+                placeName: astroStore.placeName,
+                tideStatusMessage: astroStore.tideStatusMessage
+            )
         case .stargazing:
             StargazingCard(
                 forecast: astroStore.forecast,
                 locationStatusMessage: astroStore.locationStatusMessage,
-                weatherStatusMessage: astroStore.weatherStatusMessage,
-                tideStatusMessage: astroStore.tideStatusMessage
+                weatherStatusMessage: astroStore.weatherStatusMessage
             )
         case .moonPlanet:
             MoonPlanetCard(forecast: astroStore.forecast)
@@ -417,6 +422,7 @@ private enum DashboardModule: String, CaseIterable, Identifiable {
     case caffeine
     case quickDose
     case barometer
+    case weather
     case stargazing
     case moonPlanet
     case trainingStatus
@@ -434,6 +440,7 @@ private enum DashboardModule: String, CaseIterable, Identifiable {
         case .caffeine: return "咖啡因"
         case .quickDose: return "快速记录"
         case .barometer: return "实时气压"
+        case .weather: return "天气"
         case .stargazing: return "观星"
         case .moonPlanet: return "月亮/行星"
         case .trainingStatus: return "训练状态"
@@ -451,6 +458,7 @@ private enum DashboardModule: String, CaseIterable, Identifiable {
         case .caffeine: return "cup.and.saucer.fill"
         case .quickDose: return "plus.circle.fill"
         case .barometer: return "barometer"
+        case .weather: return "cloud.sun.fill"
         case .stargazing: return "sparkles"
         case .moonPlanet: return "moon.stars.fill"
         case .trainingStatus: return "figure.run"
@@ -467,6 +475,7 @@ private enum DashboardModule: String, CaseIterable, Identifiable {
         .caffeine,
         .quickDose,
         .barometer,
+        .weather,
         .stargazing,
         .moonPlanet,
         .trainingStatus,
@@ -981,6 +990,156 @@ private struct BarometerCard: View {
     }
 }
 
+private struct WeatherCard: View {
+    let snapshot: WeatherSnapshot
+    let placeName: String
+    let tideStatusMessage: String
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 6),
+        GridItem(.flexible(), spacing: 6),
+        GridItem(.flexible(), spacing: 6)
+    ]
+
+    var body: some View {
+        HalfCupCard {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack(alignment: .firstTextBaseline) {
+                    Label("天气", systemImage: "cloud.sun.fill")
+                        .font(.headline.weight(.semibold))
+
+                    Spacer()
+                }
+
+                WeatherPlaceRow(value: placeName)
+
+                LazyVGrid(columns: columns, spacing: 6) {
+                    WeatherMetricTile(title: "低云", value: snapshot.lowCloudText, tint: .cyan)
+                    WeatherMetricTile(title: "中云", value: snapshot.midCloudText, tint: .blue)
+                    WeatherMetricTile(title: "高云", value: snapshot.highCloudText, tint: .indigo)
+                    WeatherMetricTile(title: "风", value: snapshot.windText, tint: .mint)
+                    WeatherMetricTile(title: "AQI", value: snapshot.aqiText, tint: aqiTint)
+                    WeatherMetricTile(title: "UV", value: snapshot.uvText, tint: uvTint)
+                }
+
+                MetricPill(title: "海温", value: snapshot.seaTemperatureText, tint: .teal)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                WeatherTideRow(value: tideStatusMessage)
+            }
+        }
+    }
+
+    private var aqiTint: Color {
+        guard let aqi = snapshot.aqi else { return .secondary }
+
+        switch aqi {
+        case ..<51:
+            return .green
+        case 51..<101:
+            return .yellow
+        case 101..<151:
+            return .orange
+        default:
+            return .red
+        }
+    }
+
+    private var uvTint: Color {
+        guard let uvIndex = snapshot.uvIndex else { return .secondary }
+
+        switch uvIndex {
+        case ..<3:
+            return .green
+        case 3..<6:
+            return .yellow
+        case 6..<8:
+            return .orange
+        default:
+            return .red
+        }
+    }
+}
+
+private struct WeatherPlaceRow: View {
+    let value: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "location.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.cyan)
+                .frame(width: 12)
+
+            Text(value)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 7)
+        .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+private struct WeatherTideRow: View {
+    let value: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "water.waves")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.cyan)
+                .frame(width: 12)
+
+            Text("潮汐")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Text(value)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .foregroundStyle(.cyan)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 7)
+        .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+private struct WeatherMetricTile: View {
+    let title: String
+    let value: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Text(value)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(tint)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.56)
+        }
+        .padding(.horizontal, 7)
+        .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
+        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
 private struct StressOverviewCard: View {
     let healthStore: HealthMetricsStore
     let snapshot: HealthStressSnapshot
@@ -1097,7 +1256,6 @@ private struct StargazingCard: View {
     let forecast: AstroForecast
     let locationStatusMessage: String
     let weatherStatusMessage: String
-    let tideStatusMessage: String
 
     var body: some View {
         HalfCupCard {
@@ -1169,19 +1327,6 @@ private struct StargazingCard: View {
                         .foregroundStyle(.secondary)
                 }
 
-                HStack(spacing: 6) {
-                    Image(systemName: "water.waves")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.cyan)
-
-                    Text(tideStatusMessage)
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-
-                    Spacer(minLength: 0)
-                }
             }
         }
     }

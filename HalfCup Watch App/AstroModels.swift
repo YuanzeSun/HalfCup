@@ -5,6 +5,7 @@
 
 import CoreLocation
 import Foundation
+import MapKit
 import Observation
 
 struct ObservationSite: Equatable {
@@ -89,6 +90,75 @@ struct AstroRadarFactor: Identifiable, Equatable {
     let title: String
     let valueText: String
     let score: Int
+}
+
+struct WeatherSnapshot: Equatable {
+    let lowCloudPercent: Int?
+    let midCloudPercent: Int?
+    let highCloudPercent: Int?
+    let windSpeedKPH: Double?
+    let windDirectionDegrees: Double?
+    let aqi: Int?
+    let uvIndex: Double?
+    let seaSurfaceTemperatureCelsius: Double?
+    let updatedAt: Date?
+
+    static let unavailable = WeatherSnapshot(
+        lowCloudPercent: nil,
+        midCloudPercent: nil,
+        highCloudPercent: nil,
+        windSpeedKPH: nil,
+        windDirectionDegrees: nil,
+        aqi: nil,
+        uvIndex: nil,
+        seaSurfaceTemperatureCelsius: nil,
+        updatedAt: nil
+    )
+
+    var lowCloudText: String {
+        Self.percentText(lowCloudPercent)
+    }
+
+    var midCloudText: String {
+        Self.percentText(midCloudPercent)
+    }
+
+    var highCloudText: String {
+        Self.percentText(highCloudPercent)
+    }
+
+    var windText: String {
+        guard let windSpeedKPH else { return "N/A" }
+        let speedText = "\(Int(windSpeedKPH.rounded())) km/h"
+        guard let windDirectionDegrees else { return speedText }
+        return "\(speedText) \(Self.windDirectionText(windDirectionDegrees))"
+    }
+
+    var aqiText: String {
+        aqi.map { "\($0)" } ?? "N/A"
+    }
+
+    var uvText: String {
+        guard let uvIndex else { return "N/A" }
+        return String(format: "%.1f", uvIndex)
+    }
+
+    var seaTemperatureText: String {
+        guard let seaSurfaceTemperatureCelsius else { return "N/A" }
+        return String(format: "%.1f°C", seaSurfaceTemperatureCelsius)
+    }
+
+    private static func percentText(_ value: Int?) -> String {
+        value.map { "\($0)%" } ?? "N/A"
+    }
+
+    private static func windDirectionText(_ degrees: Double) -> String {
+        let normalized = ((degrees.truncatingRemainder(dividingBy: 360)) + 360)
+            .truncatingRemainder(dividingBy: 360)
+        let directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+        let index = Int((normalized / 45).rounded()) % directions.count
+        return directions[index]
+    }
 }
 
 struct PlanetVisibility: Identifiable, Equatable {
@@ -189,9 +259,12 @@ final class AstroStore {
     private(set) var forecast: AstroForecast
     private(set) var locationStatusMessage = "等待定位"
     private(set) var weatherStatusMessage = "等待云量"
+    private(set) var weatherSnapshot = WeatherSnapshot.unavailable
+    private(set) var placeName = "N/A"
     private(set) var tideStatusMessage = "潮汐估算"
 
     @ObservationIgnored private let locationProvider = LocationProvider()
+    @ObservationIgnored private let placeProvider = PlaceProvider()
     @ObservationIgnored private let weatherProvider = WeatherProvider()
 
     init(date: Date = Date(), site: ObservationSite = .fallback) {
@@ -217,11 +290,12 @@ final class AstroStore {
         let site = forecast.site
         guard site.hasResolvedLocation else {
             weatherStatusMessage = "云量 N/A"
+            weatherSnapshot = .unavailable
             return
         }
 
         Task {
-            await updateCloudCover(for: site)
+            await updateWeather(for: site)
         }
     }
 
@@ -241,7 +315,8 @@ final class AstroStore {
                 self.tideStatusMessage = AstroCalculator.tideSummary(for: Date(), site: site)
                 self.locationStatusMessage = ""
                 Task {
-                    await self.updateCloudCover(for: site)
+                    await self.updatePlaceName(for: location)
+                    await self.updateWeather(for: site)
                 }
             }
         }
@@ -253,24 +328,39 @@ final class AstroStore {
         }
     }
 
-    private func updateCloudCover(for site: ObservationSite) async {
+    private func updatePlaceName(for location: CLLocation) async {
+        do {
+            let placeName = try await placeProvider.placeName(for: location)
+            await MainActor.run {
+                self.placeName = placeName
+            }
+        } catch {
+            await MainActor.run {
+                self.placeName = "N/A"
+            }
+        }
+    }
+
+    private func updateWeather(for site: ObservationSite) async {
         await MainActor.run {
             weatherStatusMessage = "云量更新中"
         }
 
         do {
-            let reading = try await weatherProvider.currentCloudCover(
+            let reading = try await weatherProvider.currentWeather(
                 latitude: site.latitude,
                 longitude: site.longitude
             )
             await MainActor.run {
-                let updatedSite = site.withCloudCover(reading.percent)
+                let updatedSite = site.withCloudCover(reading.cloudCoverPercent)
                 forecast = AstroCalculator.forecast(for: Date(), site: updatedSite)
-                weatherStatusMessage = "云量 \(reading.percent)%"
+                weatherSnapshot = reading.snapshot
+                weatherStatusMessage = "云量 \(reading.cloudCoverPercent)%"
             }
         } catch {
             await MainActor.run {
                 weatherStatusMessage = cloudErrorMessage(error)
+                weatherSnapshot = .unavailable
             }
         }
     }
@@ -280,38 +370,234 @@ final class AstroStore {
     }
 }
 
-private final class WeatherProvider {
-    struct CloudCoverReading {
-        let percent: Int
-        let source: String
+private final class PlaceProvider {
+    private var lastLocation: CLLocation?
+    private var lastPlaceName: String?
+    private var lastLookupDate: Date?
+
+    func placeName(for location: CLLocation) async throws -> String {
+        if let cached = cachedPlaceName(for: location) {
+            return cached
+        }
+
+        guard let request = MKReverseGeocodingRequest(location: location) else {
+            throw MKError(.placemarkNotFound)
+        }
+        request.preferredLocale = .autoupdatingCurrent
+
+        let mapItems = try await mapItems(for: request)
+        guard let mapItem = mapItems.first,
+              let addressRepresentations = mapItem.addressRepresentations
+        else {
+            throw MKError(.placemarkNotFound)
+        }
+
+        let components = [
+            addressRepresentations.regionName,
+            addressRepresentations.cityName,
+            mapItem.name
+        ]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .reduce(into: [String]()) { output, component in
+                if output.last != component {
+                    output.append(component)
+                }
+            }
+
+        guard !components.isEmpty else {
+            throw MKError(.placemarkNotFound)
+        }
+
+        let placeName = components.joined(separator: "·")
+        lastLocation = location
+        lastPlaceName = placeName
+        lastLookupDate = Date()
+        return placeName
     }
 
-    private struct OpenMeteoResponse: Decodable {
+    private func mapItems(for request: MKReverseGeocodingRequest) async throws -> [MKMapItem] {
+        try await withCheckedThrowingContinuation { continuation in
+            request.getMapItems { mapItems, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                continuation.resume(returning: mapItems ?? [])
+            }
+        }
+    }
+
+    private func cachedPlaceName(for location: CLLocation) -> String? {
+        guard let lastLocation,
+              let lastPlaceName,
+              let lastLookupDate,
+              location.distance(from: lastLocation) < 1_000,
+              Date().timeIntervalSince(lastLookupDate) < 30 * 60
+        else {
+            return nil
+        }
+
+        return lastPlaceName
+    }
+}
+
+private final class WeatherProvider {
+    struct WeatherReading {
+        let cloudCoverPercent: Int
+        let snapshot: WeatherSnapshot
+    }
+
+    private struct ForecastResponse: Decodable {
         let current: CurrentWeather?
     }
 
     private struct CurrentWeather: Decodable {
         let cloudCover: Int?
+        let cloudCoverLow: Int?
+        let cloudCoverMid: Int?
+        let cloudCoverHigh: Int?
+        let windSpeed: Double?
+        let windDirection: Double?
+        let uvIndex: Double?
 
         private enum CodingKeys: String, CodingKey {
             case cloudCover = "cloud_cover"
+            case cloudCoverLow = "cloud_cover_low"
+            case cloudCoverMid = "cloud_cover_mid"
+            case cloudCoverHigh = "cloud_cover_high"
+            case windSpeed = "wind_speed_10m"
+            case windDirection = "wind_direction_10m"
+            case uvIndex = "uv_index"
         }
     }
 
-    func currentCloudCover(latitude: Double, longitude: Double) async throws -> CloudCoverReading {
-        let percent = try await openMeteoCloudCover(latitude: latitude, longitude: longitude)
-        return CloudCoverReading(percent: percent, source: "Open-Meteo")
+    private struct AirQualityResponse: Decodable {
+        let current: CurrentAirQuality?
     }
 
-    private func openMeteoCloudCover(latitude: Double, longitude: Double) async throws -> Int {
+    private struct CurrentAirQuality: Decodable {
+        let aqi: Int?
+
+        private enum CodingKeys: String, CodingKey {
+            case aqi = "us_aqi"
+        }
+    }
+
+    private struct MarineResponse: Decodable {
+        let current: CurrentMarine?
+    }
+
+    private struct CurrentMarine: Decodable {
+        let seaSurfaceTemperature: Double?
+
+        private enum CodingKeys: String, CodingKey {
+            case seaSurfaceTemperature = "sea_surface_temperature"
+        }
+    }
+
+    func currentWeather(latitude: Double, longitude: Double) async throws -> WeatherReading {
+        async let forecast = openMeteoForecast(latitude: latitude, longitude: longitude)
+        async let aqi = openMeteoAQI(latitude: latitude, longitude: longitude)
+        async let seaTemperature = openMeteoSeaTemperature(latitude: latitude, longitude: longitude)
+
+        let forecastCurrent = try await forecast
+        let currentAQI: Int?
+        do {
+            currentAQI = try await aqi
+        } catch {
+            currentAQI = nil
+        }
+
+        let currentSeaTemperature: Double?
+        do {
+            currentSeaTemperature = try await seaTemperature
+        } catch {
+            currentSeaTemperature = nil
+        }
+        let snapshot = WeatherSnapshot(
+            lowCloudPercent: forecastCurrent.cloudCoverLow,
+            midCloudPercent: forecastCurrent.cloudCoverMid,
+            highCloudPercent: forecastCurrent.cloudCoverHigh,
+            windSpeedKPH: forecastCurrent.windSpeed,
+            windDirectionDegrees: forecastCurrent.windDirection,
+            aqi: currentAQI,
+            uvIndex: forecastCurrent.uvIndex,
+            seaSurfaceTemperatureCelsius: currentSeaTemperature,
+            updatedAt: Date()
+        )
+
+        return WeatherReading(
+            cloudCoverPercent: forecastCurrent.cloudCover ?? maxCloudCover(from: snapshot),
+            snapshot: snapshot
+        )
+    }
+
+    private func openMeteoForecast(latitude: Double, longitude: Double) async throws -> CurrentWeather {
         var components = URLComponents(string: "https://api.open-meteo.com/v1/forecast")
         components?.queryItems = [
             URLQueryItem(name: "latitude", value: String(format: "%.5f", latitude)),
             URLQueryItem(name: "longitude", value: String(format: "%.5f", longitude)),
-            URLQueryItem(name: "current", value: "cloud_cover"),
+            URLQueryItem(
+                name: "current",
+                value: [
+                    "cloud_cover",
+                    "cloud_cover_low",
+                    "cloud_cover_mid",
+                    "cloud_cover_high",
+                    "wind_speed_10m",
+                    "wind_direction_10m",
+                    "uv_index"
+                ].joined(separator: ",")
+            ),
+            URLQueryItem(name: "wind_speed_unit", value: "kmh"),
             URLQueryItem(name: "timezone", value: "auto")
         ]
 
+        let decoded: ForecastResponse = try await requestDecoded(components: components)
+        guard let current = decoded.current, current.cloudCover != nil else {
+            throw URLError(.cannotParseResponse)
+        }
+
+        return current
+    }
+
+    private func openMeteoAQI(latitude: Double, longitude: Double) async throws -> Int {
+        var components = URLComponents(string: "https://air-quality-api.open-meteo.com/v1/air-quality")
+        components?.queryItems = [
+            URLQueryItem(name: "latitude", value: String(format: "%.5f", latitude)),
+            URLQueryItem(name: "longitude", value: String(format: "%.5f", longitude)),
+            URLQueryItem(name: "current", value: "us_aqi"),
+            URLQueryItem(name: "timezone", value: "auto")
+        ]
+
+        let decoded: AirQualityResponse = try await requestDecoded(components: components)
+        guard let aqi = decoded.current?.aqi else {
+            throw URLError(.cannotParseResponse)
+        }
+
+        return aqi
+    }
+
+    private func openMeteoSeaTemperature(latitude: Double, longitude: Double) async throws -> Double {
+        var components = URLComponents(string: "https://marine-api.open-meteo.com/v1/marine")
+        components?.queryItems = [
+            URLQueryItem(name: "latitude", value: String(format: "%.5f", latitude)),
+            URLQueryItem(name: "longitude", value: String(format: "%.5f", longitude)),
+            URLQueryItem(name: "current", value: "sea_surface_temperature"),
+            URLQueryItem(name: "timezone", value: "auto")
+        ]
+
+        let decoded: MarineResponse = try await requestDecoded(components: components)
+        guard let seaTemperature = decoded.current?.seaSurfaceTemperature else {
+            throw URLError(.cannotParseResponse)
+        }
+
+        return seaTemperature
+    }
+
+    private func requestDecoded<Response: Decodable>(components: URLComponents?) async throws -> Response {
         guard let url = components?.url else {
             throw URLError(.badURL)
         }
@@ -326,12 +612,17 @@ private final class WeatherProvider {
             throw URLError(.badServerResponse)
         }
 
-        let decoded = try JSONDecoder().decode(OpenMeteoResponse.self, from: data)
-        guard let cloudCover = decoded.current?.cloudCover else {
-            throw URLError(.cannotParseResponse)
-        }
+        return try JSONDecoder().decode(Response.self, from: data)
+    }
 
-        return cloudCover
+    private func maxCloudCover(from snapshot: WeatherSnapshot) -> Int {
+        [
+            snapshot.lowCloudPercent,
+            snapshot.midCloudPercent,
+            snapshot.highCloudPercent
+        ]
+            .compactMap { $0 }
+            .max() ?? 0
     }
 
 }
